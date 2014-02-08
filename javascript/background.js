@@ -1,40 +1,19 @@
 /**
- * Copyright (c) 2011 The Chromium Authors. All rights reserved.
- * Use of this source code is governed by a BSD-style license that can be
- * found in the LICENSE file.
+ *
+ * Based on code by The Chromium Authors.
  */
 
 /**
- * PHASES
- * 1) Load next event from server refresh every 30 minutes or every time
- *   you go to calendar or every time you logout drop in a data object.
- * 2) Display on screen periodically once per minute or on demand.
  */
-
-// Message shown in badge title when no title is given to an event.
-var MSG_NO_TITLE = chrome.i18n.getMessage('noTitle');
-
-// Time between server polls = 30 minutes.
-var POLL_INTERVAL = 30 * 60 * 1000;
 
 // Redraw interval is 1 min.
 var DRAW_INTERVAL = 60 * 1000;
 
-// The time when we last polled.
-var lastPollTime_ = 0;
-
-// Object for BadgeAnimation
-var badgeAnimation_;
-
 //Object for CanvasAnimation
 var canvasAnimation_;
 
-// Object containing the event.
-var nextEvent_ = null;
-
 // Storing events.
 var eventList = [];
-var nextEvents = [];
 
 // Storing calendars.
 var calendars = [];
@@ -56,65 +35,6 @@ var GOOGLE_CALENDAR_URL = 'http://www.google.com/calendar/render';
 
 //URL for declining invitation of the event.
 var DECLINED_URL = 'http://schemas.google.com/g/2005#event.declined';
-
-//This is used to poll only once per second at most, and delay that if
-//we keep hitting pages that would otherwise force a load.
-var pendingLoadId_ = null;
-
-/**
- * A "loading" animation displayed while we wait for the first response from
- * Calendar. This animates the badge text with a dot that cycles from left to
- * right.
- * @constructor
- */
-function BadgeAnimation() {
-  this.timerId_ = 0;
-  this.maxCount_ = 8;  // Total number of states in animation
-  this.current_ = 0;  // Current state
-  this.maxDot_ = 4;  // Max number of dots in animation
-};
-
-/**
- * Paints the badge text area while loading the data.
- */
-BadgeAnimation.prototype.paintFrame = function() {
-  var text = '';
-  for (var i = 0; i < this.maxDot_; i++) {
-    text += (i == this.current_) ? '.' : ' ';
-  }
-
-  chrome.browserAction.setBadgeText({text: text});
-  this.current_++;
-  if (this.current_ == this.maxCount_) {
-    this.current_ = 0;
-  }
-};
-
-/**
- * Starts the animation process.
- */
-BadgeAnimation.prototype.start = function() {
-  if (this.timerId_) {
-    return;
-  }
-
-  var self = this;
-  this.timerId_ = window.setInterval(function() {
-    self.paintFrame();
-  }, 100);
-};
-
-/**
- * Stops the animation process.
- */
-BadgeAnimation.prototype.stop = function() {
-  if (!this.timerId_) {
-    return;
-  }
-
-  window.clearInterval(this.timerId_);
-  this.timerId_ = 0;
-};
 
 /**
  * Animates the canvas after loading the data from all the calendars. It
@@ -180,51 +100,16 @@ CanvasAnimation.prototype.getSector = function(sector) {
  * Draws the event icon and determines the badge title and icon title.
  */
 CanvasAnimation.prototype.drawFinal = function() {
-  badgeAnimation_.stop();
-
-  if (!nextEvent_) {
-    this.showLoggedOut();
-  } else {
     this.drawIconAtRotation();
     this.rotation_ = 0;
+    pollUnderProgress = false;
 
-    var ms = nextEvent_.startTime.getTime() - getCurrentTime();
-    var nextEventMin = ms / (1000 * 60);
-    var bgColor = (nextEventMin < 60) ? this.RED : this.BLUE;
-
-    chrome.browserAction.setBadgeBackgroundColor({color: bgColor});
-    currentBadge_ = this.getBadgeText(nextEvent_);
-    chrome.browserAction.setBadgeText({text: currentBadge_});
-
-    if (nextEvents.length > 0) {
-      var text = '';
-      for (var i = 0, event; event = nextEvents[i]; i++) {
-        text += event.title;
-        if (event.author || event.location) {
-          text += '\n';
-        }
-        if (event.location) {
-          text += event.location + ' ';
-        }
-        if (event.author) {
-          text += event.author;
-        }
-        if (i < (nextEvents.length - 1)) {
-          text += '\n----------\n';
-        }
-      }
-      text = filterSpecialChar(text);
-      chrome.browserAction.setTitle({'title' : text});
-    }
-  }
-  pollUnderProgress = false;
-
-  chrome.extension.sendRequest({
+    chrome.extension.sendRequest({
     message: 'enableSave'
-  }, function() {
-  });
+    }, function() {
+    });
 
-  return;
+    return;
 };
 
 /**
@@ -234,34 +119,6 @@ CanvasAnimation.prototype.showLoggedOut = function() {
   currentBadge_ = '?';
   chrome.browserAction.setIcon({path: '../images/icon-16_bw.gif'});
   chrome.browserAction.setBadgeBackgroundColor({color: [190, 190, 190, 230]});
-  chrome.browserAction.setBadgeText({text: '?'});
-  chrome.browserAction.setTitle({ 'title' : ''});
-};
-
-/**
- * Gets the badge text.
- * @param {Object} nextEvent_ next event in the calendar.
- * @return {String} text Badge text to be shown in extension icon.
- */
-CanvasAnimation.prototype.getBadgeText = function(nextEvent_) {
-  if (!nextEvent_) {
-    return '';
-  }
-
-  var ms = nextEvent_.startTime.getTime() - getCurrentTime();
-  var nextEventMin = Math.ceil(ms / (1000 * 60));
-
-  var text = '';
-  if (nextEventMin < 60) {
-    text = chrome.i18n.getMessage('minutes', nextEventMin.toString());
-  } else if (nextEventMin < 1440) {
-    text = chrome.i18n.getMessage('hours',
-               Math.round(nextEventMin / 60).toString());
-  } else if (nextEventMin < (1440 * 10)) {
-    text = chrome.i18n.getMessage('days',
-               Math.round(nextEventMin / 60 / 24).toString());
-  }
-  return text;
 };
 
 /**
@@ -317,21 +174,19 @@ CalendarManager.extractEvent = function(elem, mailId) {
 
 /**
  * Polls the server to get the feed of the user.
+ * @param {cb} Polls the server and calls cb with the events retrieved.
  */
 CalendarManager.pollServer = function(cb) {
-  if (! pollUnderProgress) {
+  if (!pollUnderProgress) {
     eventList = [];
     pollUnderProgress = true;
-    pendingLoadId_ = null;
     calendars = [];
-    lastPollTime_ = getCurrentTime();
     var url;
     var xhr = new XMLHttpRequest();
     try {
       xhr.onreadystatechange = CalendarManager.genResponseChangeFunc(xhr, cb);
       xhr.onerror = function(error) {
         console.log('error: ' + error);
-        nextEvent_ = null;
         canvasAnimation_.drawFinal();
       };
       if (isMultiCalendar) {
@@ -344,7 +199,6 @@ CalendarManager.pollServer = function(cb) {
       xhr.send(null);
     } catch (e) {
       console.log('ex: ' + e);
-      nextEvent_ = null;
       canvasAnimation_.drawFinal();
     }
   }
@@ -354,6 +208,7 @@ CalendarManager.pollServer = function(cb) {
  * Gathers the list of all calendars of a specific user for multiple calendar
  * support and event entries in single calendar.
  * @param {xmlHttpRequest} xhr xmlHttpRequest object containing server response.
+ * @param {cb} callback to call when all data has been retrieved.
  * @return {Object} anonymous function which returns to onReadyStateChange.
  */
 CalendarManager.genResponseChangeFunc = function(xhr, cb) {
@@ -363,7 +218,6 @@ CalendarManager.genResponseChangeFunc = function(xhr, cb) {
     }
     if (!xhr.responseXML) {
       console.log('No responseXML');
-      nextEvent_ = null;
       canvasAnimation_.drawFinal();
       return;
     }
@@ -398,7 +252,6 @@ CalendarManager.genResponseChangeFunc = function(xhr, cb) {
     }
 
     console.error('Error: feed retrieved, but no event found');
-    nextEvent_ = null;
     canvasAnimation_.drawFinal();
   };
 };
@@ -406,6 +259,7 @@ CalendarManager.genResponseChangeFunc = function(xhr, cb) {
 /**
  * Retrieves feed for a calendar
  * @param {integer} calendarId Id of the calendar in array of calendars.
+ * @param {cb} callback to call when feed has completed.
  */
 CalendarManager.getCalendarFeed = function(calendarId, cb) {
   var xmlhttp = new XMLHttpRequest();
@@ -414,7 +268,6 @@ CalendarManager.getCalendarFeed = function(calendarId, cb) {
                                      calendarId, cb);
     xmlhttp.onerror = function(error) {
       console.log('error: ' + error);
-      nextEvent_ = null;
       canvasAnimation_.drawFinal();
     };
 
@@ -423,7 +276,6 @@ CalendarManager.getCalendarFeed = function(calendarId, cb) {
   }
   catch (e) {
     console.log('ex: ' + e);
-    nextEvent_ = null;
     canvasAnimation_.drawFinal();
   }
 };
@@ -434,6 +286,7 @@ CalendarManager.getCalendarFeed = function(calendarId, cb) {
  *     for the feed of a specific calendar.
  * @param {integer} calendarId Variable for storing the no of calendars
  *     processed.
+ * @param {cb} The callback function to call with the requested events
  * @return {Object} anonymous function which returns to onReadyStateChange.
  */
 CalendarManager.onCalendarResponse = function(xmlhttp, calendarId, cb) {
@@ -443,7 +296,6 @@ CalendarManager.onCalendarResponse = function(xmlhttp, calendarId, cb) {
     }
     if (!xmlhttp.responseXML) {
       console.log('No responseXML');
-      nextEvent_ = null;
       canvasAnimation_.drawFinal();
       return;
     }
@@ -455,6 +307,7 @@ CalendarManager.onCalendarResponse = function(xmlhttp, calendarId, cb) {
  * Parses events from calendar response XML
  * @param {string} responseXML Response XML for calendar.
  * @param {integer} calendarId  Id of the calendar in array of calendars.
+ * @param {cb} callback to call with parsed calendar entries.
  */
 CalendarManager.parseCalendarEntry = function(responseXML, calendarId, cb) {
   var entry_ = responseXML.getElementsByTagName('entry');
@@ -490,45 +343,9 @@ CalendarManager.parseCalendarEntry = function(responseXML, calendarId, cb) {
   if (calendarId < calendars.length) {
     CalendarManager.getCalendarFeed(calendarId, cb);
   } else {
-    CalendarManager.populateLatestEvent(eventList);
     if (cb !== undefined) {
       cb(eventList);
     }
-  }
-};
-
-/**
- * Fills the event list with the events acquired from the calendar(s).
- * Parses entire event list and prepares an array of upcoming events.
- * @param {Array} eventList List of all events.
- */
-CalendarManager.populateLatestEvent = function(eventList) {
-  nextEvents = [];
-  if (isMultiCalendar) {
-    eventList.sort(sortByDate);
-  }
-
-  //populating next events array.
-  if (eventList.length > 0) {
-    nextEvent_ = eventList[0];
-    nextEvents.push(nextEvent_);
-    var startTime = nextEvent_.startTime.setSeconds(0, 0);
-    for (var i = 1, event; event = eventList[i]; i++) {
-      var time = event.startTime.setSeconds(0, 0);
-      if (time == startTime) {
-        nextEvents.push(event);
-      } else {
-        break;
-      }
-    }
-    if (nextEvents.length > 1 && isMultiCalendar) {
-      nextEvents.sort(sortByAuthor);
-    }
-    canvasAnimation_.animate();
-    return;
-  } else {
-    console.error('Error: feed retrieved, but no event found');
-    nextEvent_ = null;
     canvasAnimation_.drawFinal();
   }
 };
@@ -579,49 +396,10 @@ function rfc3339StringToDate(rfc3339) {
 };
 
 /**
- * Sorts all the events by date and time.
- * @param {object} event_1 Event object.
- * @param {object} event_2 Event object.
- * @return {integer} timeDiff Difference in time.
- */
-function sortByDate(event_1, event_2) {
-  return (event_1.startTime.getTime() - event_2.startTime.getTime());
-};
-
-/**
- * Sorts all the events by author name.
- * @param {object} event_1 Event object.
- * @param {object} event_2 Event object.
- * @return {integer} nameDiff Difference in default author and others.
- */
-function sortByAuthor(event_1, event_2) {
-  var nameDiff;
-  if (event_1.author && event_2.author && event_2.author == defaultAuthor) {
-    nameDiff = 1;
-  } else {
-    return 0;
-  }
-  return nameDiff;
-};
-
-/**
  * Fires once per minute to redraw extension icon.
  */
 function redraw() {
-  // If the next event just passed, re-poll.
-  if (nextEvent_) {
-    var t = nextEvent_.startTime.getTime() - getCurrentTime();
-    if (t <= 0) {
-      CalendarManager.pollServer();
-      return;
-    }
-  }
   canvasAnimation_.animate();
-
-  // if 30 minutes have passed re-poll
-  if (getCurrentTime() - lastPollTime_ >= POLL_INTERVAL) {
-    CalendarManager.pollServer();
-  }
 };
 
 /**
@@ -633,62 +411,10 @@ function getCurrentTime() {
 };
 
 /**
-* Replaces ASCII characters from the title.
-* @param {String} data String containing ASCII code for special characters.
-* @return {String} data ASCII characters replaced with actual characters.
-*/
-function filterSpecialChar(data) {
-  if (data) {
-    data = data.replace(/&lt;/g, '<');
-    data = data.replace(/&gt;/g, '>');
-    data = data.replace(/&amp;/g, '&');
-    data = data.replace(/%7B/g, '{');
-    data = data.replace(/%7D/g, '}');
-    data = data.replace(/&quot;/g, '"');
-    data = data.replace(/&#39;/g, '\'');
-  }
-  return data;
-};
-
-/**
  * Called from options.js page on saving the settings
  */
 function onSettingsChange() {
   isMultiCalendar = JSON.parse(localStorage.multiCalendar);
-  badgeAnimation_.start();
-  CalendarManager.pollServer();
-};
-
-/**
- * Function runs on updating a tab having url of google applications.
- * @param {integer} tabId Id of the tab which is updated.
- * @param {String} changeInfo Gives the information of change in url.
- * @param {String} tab Gives the url of the tab updated.
- */
-function onTabUpdated(tabId, changeInfo, tab) {
-  var url = tab.url;
-  if (!url) {
-    return;
-  }
-
-  if ((url.indexOf('www.google.com/calendar/') != -1) ||
-      ((url.indexOf('www.google.com/a/') != -1) &&
-      (url.lastIndexOf('/acs') == url.length - 4)) ||
-      (url.indexOf('www.google.com/accounts/') != -1)) {
-
-    // The login screen isn't helpful
-    if (url.indexOf('https://www.google.com/accounts/ServiceLogin?') == 0) {
-      return;
-    }
-
-    if (pendingLoadId_) {
-      clearTimeout(pendingLoadId_);
-      pendingLoadId_ = null;
-    }
-
-    // try to poll in 2 second [which makes the redirects settle down]
-    pendingLoadId_ = setTimeout(CalendarManager.pollServer, 2000);
-  }
 };
 
 /**
@@ -696,11 +422,12 @@ function onTabUpdated(tabId, changeInfo, tab) {
  */
 function onClickAction() {
   chrome.tabs.query({currentWindow: true, active: true}, function(tabs) {
-      var tab = tabs[0];
+    var tab = tabs[0];
     if (tab.url && tab.url.indexOf('when2meet.com') != -1) {
-        console.log('THIS IS WHEN2MEET I AM HAPPY');
+        console.log('Icon clicked!');
+
         cb = function(events) {
-            console.log('IM IN UR cALLBACK');
+            console.log('Callback entered!');
             var port = chrome.tabs.connect(tab.id, {name: 'when2meet'});
             var blackoutlist = [];
             for (var i = 0; i < events.length; i++) {
@@ -713,41 +440,25 @@ function onClickAction() {
                     blackoutlist.push(datum);
                 }
             }
-            console.log(blackoutlist);
             port.postMessage({data: blackoutlist});
         }
+
         CalendarManager.pollServer(cb);
     } else {
-        console.error('THIS IS NOT WHEN2MEET I BLOW UP');
     }
   });
-};
-
-/**
- * Checks whether an instance of Google calendar is already open.
- * @param {String} url Url of the tab visited.
- * @return {boolean} true if the url is a Google calendar relative url, false
- *     otherwise.
- */
-function isCalendarUrl(url) {
-  return url.indexOf('www.google.com/calendar') != -1 ? true : false;
 };
 
 /**
  * Initializes everything.
  */
 function init() {
-  badgeAnimation_ = new BadgeAnimation();
   canvasAnimation_ = new CanvasAnimation();
 
   isMultiCalendar = JSON.parse(localStorage.multiCalendar || false);
 
   chrome.browserAction.setIcon({path: '../images/icon-16.gif'});
-  badgeAnimation_.start();
-  CalendarManager.pollServer();
   window.setInterval(redraw, DRAW_INTERVAL);
-
-  chrome.tabs.onUpdated.addListener(onTabUpdated);
 
   chrome.browserAction.onClicked.addListener(function(tab) {
     onClickAction();
