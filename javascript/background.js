@@ -20,7 +20,7 @@ var calendars = [];
 
 var pollUnderProgress = false;
 var defaultAuthor = '';
-var isMultiCalendar = false;
+var isMultiCalendar = true;
 
 //URL for getting feed of individual calendar support.
 var SINGLE_CALENDAR_SUPPORT_URL = 'https://www.google.com/calendar/feeds' +
@@ -411,13 +411,6 @@ function getCurrentTime() {
 };
 
 /**
- * Called from options.js page on saving the settings
- */
-function onSettingsChange() {
-  isMultiCalendar = JSON.parse(localStorage.multiCalendar);
-};
-
-/**
  * Called when the user clicks on extension icon and opens calendar page.
  */
 function onClickAction() {
@@ -454,8 +447,6 @@ function onClickAction() {
  */
 function init() {
   canvasAnimation_ = new CanvasAnimation();
-
-  isMultiCalendar = JSON.parse(localStorage.multiCalendar || false);
 
   chrome.browserAction.setIcon({path: '../images/icon-16.gif'});
   window.setInterval(redraw, DRAW_INTERVAL);

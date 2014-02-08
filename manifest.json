@@ -1,9 +1,8 @@
 {
-  "name": "__MSG_name__",
-  "description": "__MSG_description__",
+  "name": "When Not To Meet",
+  "description": "Extends when2meet.com by determing when you're free from Google Calendar",
   "default_locale":"en",
-  "options_page": "views/options.html",
-  "version": "1.2.2",
+  "version": "0.99",
   "background": {
     "page": "views/background.html"
   },
@@ -11,7 +10,7 @@
     "tabs", "activeTab", "http://*.google.com/", "https://*.google.com/"
    ],
   "browser_action": {
-    "default_title": "__MSG_title__"
+    "default_title": "Fill out when I can meet"
   },
   "icons": {
     "128": "images/icon-128.gif",
@@ -23,5 +22,5 @@
           "js": ["javascript/content.js"]
       }
   ],
-  "manifest_version": 2
+  "manifest_version": 3
 }
