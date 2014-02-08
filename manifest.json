@@ -8,7 +8,7 @@
     "page": "views/background.html"
   },
   "permissions": [
-    "tabs", "http://*.google.com/", "https://*.google.com/"
+    "tabs", "activeTab", "http://*.google.com/", "https://*.google.com/"
    ],
   "browser_action": {
     "default_title": "__MSG_title__"
@@ -17,6 +17,11 @@
     "128": "images/icon-128.gif",
     "16":"images/icon-16.gif"
   },
-
+  "content_scripts": [
+      {
+          "matches": ["http://*.when2meet.com/*", "https://*.when2meet.com/*"],
+          "js": ["javascript/content.js"]
+      }
+  ],
   "manifest_version": 2
 }

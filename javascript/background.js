@@ -318,7 +318,7 @@ CalendarManager.extractEvent = function(elem, mailId) {
 /**
  * Polls the server to get the feed of the user.
  */
-CalendarManager.pollServer = function() {
+CalendarManager.pollServer = function(cb) {
   if (! pollUnderProgress) {
     eventList = [];
     pollUnderProgress = true;
@@ -328,7 +328,7 @@ CalendarManager.pollServer = function() {
     var url;
     var xhr = new XMLHttpRequest();
     try {
-      xhr.onreadystatechange = CalendarManager.genResponseChangeFunc(xhr);
+      xhr.onreadystatechange = CalendarManager.genResponseChangeFunc(xhr, cb);
       xhr.onerror = function(error) {
         console.log('error: ' + error);
         nextEvent_ = null;
@@ -356,7 +356,7 @@ CalendarManager.pollServer = function() {
  * @param {xmlHttpRequest} xhr xmlHttpRequest object containing server response.
  * @return {Object} anonymous function which returns to onReadyStateChange.
  */
-CalendarManager.genResponseChangeFunc = function(xhr) {
+CalendarManager.genResponseChangeFunc = function(xhr, cb) {
   return function() {
     if (xhr.readyState != 4) {
       return;
@@ -382,18 +382,18 @@ CalendarManager.genResponseChangeFunc = function(xhr) {
             if (isSelected && isSelected.getAttribute('value') == 'true') {
               var calendar_content = entry.querySelector('content');
               var cal_src = calendar_content.getAttribute('src');
-              cal_src += '?toolbar=true&max-results=10';
+              cal_src += '?toolbar=true&max-results=100';
               calendars.push(cal_src);
             }
           }
         }
-        CalendarManager.getCalendarFeed(0);
+        CalendarManager.getCalendarFeed(0, cb);
         return;
       }
     } else {
       calendars = [];
       calendars.push(SINGLE_CALENDAR_SUPPORT_URL);
-      CalendarManager.parseCalendarEntry(xhr.responseXML, 0);
+      CalendarManager.parseCalendarEntry(xhr.responseXML, 0, cb);
       return;
     }
 
@@ -407,11 +407,11 @@ CalendarManager.genResponseChangeFunc = function(xhr) {
  * Retrieves feed for a calendar
  * @param {integer} calendarId Id of the calendar in array of calendars.
  */
-CalendarManager.getCalendarFeed = function(calendarId) {
+CalendarManager.getCalendarFeed = function(calendarId, cb) {
   var xmlhttp = new XMLHttpRequest();
   try {
     xmlhttp.onreadystatechange = CalendarManager.onCalendarResponse(xmlhttp,
-                                     calendarId);
+                                     calendarId, cb);
     xmlhttp.onerror = function(error) {
       console.log('error: ' + error);
       nextEvent_ = null;
@@ -436,7 +436,7 @@ CalendarManager.getCalendarFeed = function(calendarId) {
  *     processed.
  * @return {Object} anonymous function which returns to onReadyStateChange.
  */
-CalendarManager.onCalendarResponse = function(xmlhttp, calendarId) {
+CalendarManager.onCalendarResponse = function(xmlhttp, calendarId, cb) {
   return function() {
     if (xmlhttp.readyState != 4) {
       return;
@@ -447,7 +447,7 @@ CalendarManager.onCalendarResponse = function(xmlhttp, calendarId) {
       canvasAnimation_.drawFinal();
       return;
     }
-    CalendarManager.parseCalendarEntry(xmlhttp.responseXML, calendarId);
+    CalendarManager.parseCalendarEntry(xmlhttp.responseXML, calendarId, cb);
   };
 };
 
@@ -456,7 +456,7 @@ CalendarManager.onCalendarResponse = function(xmlhttp, calendarId) {
  * @param {string} responseXML Response XML for calendar.
  * @param {integer} calendarId  Id of the calendar in array of calendars.
  */
-CalendarManager.parseCalendarEntry = function(responseXML, calendarId) {
+CalendarManager.parseCalendarEntry = function(responseXML, calendarId, cb) {
   var entry_ = responseXML.getElementsByTagName('entry');
   var mailId = null;
   var author = null;
@@ -488,9 +488,12 @@ CalendarManager.parseCalendarEntry = function(responseXML, calendarId) {
   calendarId++;
   //get the next calendar
   if (calendarId < calendars.length) {
-    CalendarManager.getCalendarFeed(calendarId);
+    CalendarManager.getCalendarFeed(calendarId, cb);
   } else {
     CalendarManager.populateLatestEvent(eventList);
+    if (cb !== undefined) {
+      cb(eventList);
+    }
   }
 };
 
@@ -692,16 +695,31 @@ function onTabUpdated(tabId, changeInfo, tab) {
  * Called when the user clicks on extension icon and opens calendar page.
  */
 function onClickAction() {
-  chrome.tabs.getAllInWindow(null, function(tabs) {
-    for (var i = 0, tab; tab = tabs[i]; i++) {
-      if (tab.url && isCalendarUrl(tab.url)) {
-        chrome.tabs.update(tab.id, {selected: true});
-        CalendarManager.pollServer();
-        return;
-      }
+  chrome.tabs.query({currentWindow: true, active: true}, function(tabs) {
+      var tab = tabs[0];
+    if (tab.url && tab.url.indexOf('when2meet.com') != -1) {
+        console.log('THIS IS WHEN2MEET I AM HAPPY');
+        cb = function(events) {
+            console.log('IM IN UR cALLBACK');
+            var port = chrome.tabs.connect(tab.id, {name: 'when2meet'});
+            var blackoutlist = [];
+            for (var i = 0; i < events.length; i++) {
+                if (!events[i].isAllDay) {
+                    var datum = {
+                        'start': events[i].startTime.getTime(),
+                        'end': events[i].endTime.getTime(),
+                        'title': events[i].title
+                    }
+                    blackoutlist.push(datum);
+                }
+            }
+            console.log(blackoutlist);
+            port.postMessage({data: blackoutlist});
+        }
+        CalendarManager.pollServer(cb);
+    } else {
+        console.error('THIS IS NOT WHEN2MEET I BLOW UP');
     }
-    chrome.tabs.create({url: GOOGLE_CALENDAR_URL});
-    CalendarManager.pollServer();
   });
 };
 
