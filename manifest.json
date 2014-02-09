@@ -1,6 +1,6 @@
 {
-  "name": "When Not To Meet",
-  "description": "Extends when2meet.com by determing when you're free from Google Calendar",
+  "name": "WhenCan'tIMeet",
+  "description": "Extends when2meet.com by determining when you're free from your Google Calendar",
   "default_locale":"en",
   "version": "0.99",
   "background": {
@@ -13,8 +13,8 @@
     "default_title": "Fill out when I can meet"
   },
   "icons": {
-    "128": "images/icon-128.gif",
-    "16":"images/icon-16.gif"
+    "16":"images/icon-16.gif",
+    "128": "images/icon-128.gif"
   },
   "content_scripts": [
       {
