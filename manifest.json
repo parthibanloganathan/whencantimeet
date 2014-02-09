@@ -10,10 +10,11 @@
     "tabs", "activeTab", "http://*.google.com/", "https://*.google.com/"
    ],
   "browser_action": {
-    "default_title": "Fill out when you can meet"
+    "default_icon": "images/icon19.png",
+    "default_title": "WhenCan'tIMeet"
   },
   "icons": {
-    "16":"images/icon16.png",
+    "19":"images/icon19.png",
     "48":"images/icon48.png",
     "128": "images/icon128.png"
   },
@@ -23,5 +24,6 @@
           "js": ["javascript/content.js"]
       }
   ],
+  "homepage_url": "http://goo.gl/t9vi3X",
   "manifest_version": 2
 }
