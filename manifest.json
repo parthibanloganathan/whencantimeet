@@ -10,11 +10,12 @@
     "tabs", "activeTab", "http://*.google.com/", "https://*.google.com/"
    ],
   "browser_action": {
-    "default_title": "Fill out when I can meet"
+    "default_title": "Fill out when you can meet"
   },
   "icons": {
-    "16":"images/icon-16.gif",
-    "128": "images/icon-128.gif"
+    "16":"images/icon16.png",
+    "48":"images/icon48.png",
+    "128": "images/icon128.png"
   },
   "content_scripts": [
       {
