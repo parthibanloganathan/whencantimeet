@@ -11,6 +11,7 @@ function injectedcode(args) {
         args[i].start = Math.floor(parseInt(args[i].start, 10) / 1000) - d.getTimezoneOffset() * 60;
         args[i].end = Math.floor(parseInt(args[i].end, 10) / 1000) - d.getTimezoneOffset() * 60;
     }
+
     if (grid) {
         var tags = grid.getElementsByTagName('div');
         var times = [];
@@ -141,6 +142,8 @@ function injectedcode(args) {
                 console.log(ts, title);
             }
         }
+    } else {
+        console.error("Grid could not be found");
     }
 }
 
@@ -151,7 +154,7 @@ function run(func, args) {
 chrome.runtime.onConnect.addListener(function(port) {
     if (port.name == 'when2meet') {
         port.onMessage.addListener(function(msg) {
-            console.log('got message');
+            console.log('got message', msg);
             data = msg.data;
             args = JSON.stringify(data);
             var script = document.createElement('script');

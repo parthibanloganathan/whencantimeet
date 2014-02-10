@@ -117,7 +117,7 @@ CanvasAnimation.prototype.drawFinal = function() {
  */
 CanvasAnimation.prototype.showLoggedOut = function() {
   currentBadge_ = '?';
-  chrome.browserAction.setIcon({path: '../images/icon-16_bw.gif'});
+  chrome.browserAction.setIcon({path: '../images/icon19.png'});
   chrome.browserAction.setBadgeBackgroundColor({color: [190, 190, 190, 230]});
 };
 
@@ -448,7 +448,7 @@ function onClickAction() {
 function init() {
   canvasAnimation_ = new CanvasAnimation();
 
-  chrome.browserAction.setIcon({path: '../images/icon-16.gif'});
+  chrome.browserAction.setIcon({path: '../images/icon19.png'});
   window.setInterval(redraw, DRAW_INTERVAL);
 
   chrome.browserAction.onClicked.addListener(function(tab) {
